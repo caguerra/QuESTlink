@@ -30,6 +30,7 @@
 # include "QuEST_internal.h"
 # include "QuEST_precision.h"
 # include "QuEST_validation.h"
+# include "QuEST_qasm.h"
 # include "mt19937ar.h"
 
 #if defined(_WIN32) && ! defined(__MINGW32__)
@@ -46,12 +47,18 @@
 # include <stdlib.h>
 
 
+// expose PI on GPU build
+#ifndef M_PI 
+#define M_PI 3.1415926535897932384626433832795028841971
+#endif
+
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /* builds a bit-string where 1 indicates a qubit is present in this list */
-long long int getQubitBitMask(int* qubits, const int numQubits) {
+long long int getQubitBitMask(int* qubits, int numQubits) {
     
     long long int mask=0; 
     for (int i=0; i<numQubits; i++)
@@ -61,7 +68,7 @@ long long int getQubitBitMask(int* qubits, const int numQubits) {
 }
 
 /* builds a bit-string where 1 indicates control qubits conditioned on 0 ('flipped') */
-long long int getControlFlipMask(int* controlQubits, int* controlState, const int numControlQubits) {
+long long int getControlFlipMask(int* controlQubits, int* controlState, int numControlQubits) {
     
     long long int mask=0;
     for (int i=0; i<numControlQubits; i++)
@@ -120,7 +127,7 @@ void setConjugateMatrixN(ComplexMatrixN m) {
     int len = 1 << m.numQubits;
     macro_setConjugateMatrix(m, m, len);
 }
-
+ 
 void getComplexPairFromRotation(qreal angle, Vector axis, Complex* alpha, Complex* beta) {
     
     Vector unitAxis = getUnitVector(axis);
@@ -160,6 +167,13 @@ void getComplexPairAndPhaseFromUnitary(ComplexMatrix2 u, Complex* alpha, Complex
 void shiftIndices(int* indices, int numIndices, int shift) {
     for (int j=0; j < numIndices; j++)
         indices[j] += shift;
+}
+
+void shiftSubregIndices(int* allInds, int* numIndsPerReg, int numRegs, int shift) {
+    int i=0;
+    for (int r=0; r<numRegs; r++)
+        for (int j=0; j<numIndsPerReg[r]; j++)
+            allInds[i++] += shift;
 }
 
 int generateMeasurementOutcome(qreal zeroProb, qreal *outcomeProb) {
@@ -258,74 +272,74 @@ qreal statevec_getProbAmp(Qureg qureg, long long int index){
     return real*real + imag*imag;
 }
 
-void statevec_phaseShift(Qureg qureg, const int targetQubit, qreal angle) {
+void statevec_phaseShift(Qureg qureg, int targetQubit, qreal angle) {
     Complex term; 
     term.real = cos(angle); 
     term.imag = sin(angle);
     statevec_phaseShiftByTerm(qureg, targetQubit, term);
 }
 
-void statevec_pauliZ(Qureg qureg, const int targetQubit) {
+void statevec_pauliZ(Qureg qureg, int targetQubit) {
     Complex term; 
     term.real = -1;
     term.imag =  0;
     statevec_phaseShiftByTerm(qureg, targetQubit, term);
 }
 
-void statevec_sGate(Qureg qureg, const int targetQubit) {
+void statevec_sGate(Qureg qureg, int targetQubit) {
     Complex term; 
     term.real = 0;
     term.imag = 1;
     statevec_phaseShiftByTerm(qureg, targetQubit, term);
 } 
 
-void statevec_tGate(Qureg qureg, const int targetQubit) {
+void statevec_tGate(Qureg qureg, int targetQubit) {
     Complex term; 
     term.real = 1/sqrt(2);
     term.imag = 1/sqrt(2);
     statevec_phaseShiftByTerm(qureg, targetQubit, term);
 }
 
-void statevec_sGateConj(Qureg qureg, const int targetQubit) {
+void statevec_sGateConj(Qureg qureg, int targetQubit) {
     Complex term; 
     term.real =  0;
     term.imag = -1;
     statevec_phaseShiftByTerm(qureg, targetQubit, term);
 } 
 
-void statevec_tGateConj(Qureg qureg, const int targetQubit) {
+void statevec_tGateConj(Qureg qureg, int targetQubit) {
     Complex term; 
     term.real =  1/sqrt(2);
     term.imag = -1/sqrt(2);
     statevec_phaseShiftByTerm(qureg, targetQubit, term);
 }
 
-void statevec_rotateX(Qureg qureg, const int rotQubit, qreal angle){
+void statevec_rotateX(Qureg qureg, int rotQubit, qreal angle){
 
     Vector unitAxis = {1, 0, 0};
     statevec_rotateAroundAxis(qureg, rotQubit, angle, unitAxis);
 }
 
-void statevec_rotateY(Qureg qureg, const int rotQubit, qreal angle){
+void statevec_rotateY(Qureg qureg, int rotQubit, qreal angle){
 
     Vector unitAxis = {0, 1, 0};
     statevec_rotateAroundAxis(qureg, rotQubit, angle, unitAxis);
 }
 
-void statevec_rotateZ(Qureg qureg, const int rotQubit, qreal angle){
+void statevec_rotateZ(Qureg qureg, int rotQubit, qreal angle){
 
     Vector unitAxis = {0, 0, 1};
     statevec_rotateAroundAxis(qureg, rotQubit, angle, unitAxis);
 }
 
-void statevec_rotateAroundAxis(Qureg qureg, const int rotQubit, qreal angle, Vector axis){
+void statevec_rotateAroundAxis(Qureg qureg, int rotQubit, qreal angle, Vector axis){
 
     Complex alpha, beta;
     getComplexPairFromRotation(angle, axis, &alpha, &beta);
     statevec_compactUnitary(qureg, rotQubit, alpha, beta);
 }
 
-void statevec_rotateAroundAxisConj(Qureg qureg, const int rotQubit, qreal angle, Vector axis){
+void statevec_rotateAroundAxisConj(Qureg qureg, int rotQubit, qreal angle, Vector axis){
 
     Complex alpha, beta;
     getComplexPairFromRotation(angle, axis, &alpha, &beta);
@@ -334,14 +348,14 @@ void statevec_rotateAroundAxisConj(Qureg qureg, const int rotQubit, qreal angle,
     statevec_compactUnitary(qureg, rotQubit, alpha, beta);
 }
 
-void statevec_controlledRotateAroundAxis(Qureg qureg, const int controlQubit, const int targetQubit, qreal angle, Vector axis){
+void statevec_controlledRotateAroundAxis(Qureg qureg, int controlQubit, int targetQubit, qreal angle, Vector axis){
 
     Complex alpha, beta;
     getComplexPairFromRotation(angle, axis, &alpha, &beta);
     statevec_controlledCompactUnitary(qureg, controlQubit, targetQubit, alpha, beta);
 }
 
-void statevec_controlledRotateAroundAxisConj(Qureg qureg, const int controlQubit, const int targetQubit, qreal angle, Vector axis){
+void statevec_controlledRotateAroundAxisConj(Qureg qureg, int controlQubit, int targetQubit, qreal angle, Vector axis){
 
     Complex alpha, beta;
     getComplexPairFromRotation(angle, axis, &alpha, &beta);
@@ -350,19 +364,19 @@ void statevec_controlledRotateAroundAxisConj(Qureg qureg, const int controlQubit
     statevec_controlledCompactUnitary(qureg, controlQubit, targetQubit, alpha, beta);
 }
 
-void statevec_controlledRotateX(Qureg qureg, const int controlQubit, const int targetQubit, qreal angle){
+void statevec_controlledRotateX(Qureg qureg, int controlQubit, int targetQubit, qreal angle){
 
     Vector unitAxis = {1, 0, 0};
     statevec_controlledRotateAroundAxis(qureg, controlQubit, targetQubit, angle, unitAxis);
 }
 
-void statevec_controlledRotateY(Qureg qureg, const int controlQubit, const int targetQubit, qreal angle){
+void statevec_controlledRotateY(Qureg qureg, int controlQubit, int targetQubit, qreal angle){
 
     Vector unitAxis = {0, 1, 0};
     statevec_controlledRotateAroundAxis(qureg, controlQubit, targetQubit, angle, unitAxis);
 }
 
-void statevec_controlledRotateZ(Qureg qureg, const int controlQubit, const int targetQubit, qreal angle){
+void statevec_controlledRotateZ(Qureg qureg, int controlQubit, int targetQubit, qreal angle){
 
     Vector unitAxis = {0, 0, 1};
     statevec_controlledRotateAroundAxis(qureg, controlQubit, targetQubit, angle, unitAxis);
@@ -457,6 +471,47 @@ void statevec_multiRotatePauli(
     }
 }
 
+void statevec_multiControlledMultiRotatePauli(
+    Qureg qureg, long long int ctrlMask, int* targetQubits, enum pauliOpType* targetPaulis, int numTargets, qreal angle,
+    int applyConj
+) {
+    qreal fac = 1/sqrt(2);
+    qreal sgn = (applyConj)? 1 : -1;
+    ComplexMatrix2 uRx = {.real={{fac,0},{0,fac}}, .imag={{0,sgn*fac},{sgn*fac,0}}}; // Rx(pi/2)* rotates Z -> Y
+    ComplexMatrix2 uRy = {.real={{fac,fac},{-fac,fac}}, .imag={{0,0},{0,0}}};        // Ry(-pi/2) rotates Z -> X
+    
+    // this function is controlled on the all-one state, so no ctrl flips
+    long long int ctrlFlipMask = 0;
+    
+    // mask may be modified to remove superfluous Identity ops
+    long long int targMask = getQubitBitMask(targetQubits, numTargets);
+    
+    // rotate basis so that exp(Z) will effect exp(Y) and exp(X)
+    for (int t=0; t < numTargets; t++) {
+        if (targetPaulis[t] == PAULI_I)
+            targMask -= 1LL << targetQubits[t]; // remove target from mask
+        if (targetPaulis[t] == PAULI_X)
+            statevec_multiControlledUnitary(qureg, ctrlMask, ctrlFlipMask, targetQubits[t], uRy);
+        if (targetPaulis[t] == PAULI_Y)
+            statevec_multiControlledUnitary(qureg, ctrlMask, ctrlFlipMask, targetQubits[t], uRx);
+        // (targetPaulis[t] == 3) is Z basis
+    }
+    
+    // does nothing if there are no qubits to 'rotate'
+    if (targMask != 0)
+        statevec_multiControlledMultiRotateZ(qureg, ctrlMask, targMask, (applyConj)? -angle : angle);
+        
+    // undo X and Y basis rotations
+    uRx.imag[0][1] *= -1; uRx.imag[1][0] *= -1;
+    uRy.real[0][1] *= -1; uRy.real[1][0] *= -1;
+    for (int t=0; t < numTargets; t++) {
+        if (targetPaulis[t] == PAULI_X)
+            statevec_multiControlledUnitary(qureg, ctrlMask, ctrlFlipMask, targetQubits[t], uRy);
+        if (targetPaulis[t] == PAULI_Y)
+            statevec_multiControlledUnitary(qureg, ctrlMask, ctrlFlipMask, targetQubits[t], uRx);
+    }
+}
+
 /* produces both pauli|qureg> or pauli * qureg (as a density matrix) */
 void statevec_applyPauliProd(Qureg workspace, int* targetQubits, enum pauliOpType* pauliCodes, int numTargets) {
     
@@ -524,25 +579,25 @@ void statevec_applyPauliSum(Qureg inQureg, enum pauliOpType* allCodes, qreal* te
     }
 }
 
-void statevec_twoQubitUnitary(Qureg qureg, const int targetQubit1, const int targetQubit2, ComplexMatrix4 u) {
+void statevec_twoQubitUnitary(Qureg qureg, int targetQubit1, int targetQubit2, ComplexMatrix4 u) {
     
     long long int ctrlMask = 0;
     statevec_multiControlledTwoQubitUnitary(qureg, ctrlMask, targetQubit1, targetQubit2, u);
 }
 
-void statevec_controlledTwoQubitUnitary(Qureg qureg, const int controlQubit, const int targetQubit1, const int targetQubit2, ComplexMatrix4 u) {
+void statevec_controlledTwoQubitUnitary(Qureg qureg, int controlQubit, int targetQubit1, int targetQubit2, ComplexMatrix4 u) {
     
     long long int ctrlMask = 1LL << controlQubit;
     statevec_multiControlledTwoQubitUnitary(qureg, ctrlMask, targetQubit1, targetQubit2, u);
 }
 
-void statevec_multiQubitUnitary(Qureg qureg, int* targets, const int numTargets, ComplexMatrixN u) {
+void statevec_multiQubitUnitary(Qureg qureg, int* targets, int numTargets, ComplexMatrixN u) {
     
     long long int ctrlMask = 0;
     statevec_multiControlledMultiQubitUnitary(qureg, ctrlMask, targets, numTargets, u);
 }
 
-void statevec_controlledMultiQubitUnitary(Qureg qureg, int ctrl, int* targets, const int numTargets, ComplexMatrixN u) {
+void statevec_controlledMultiQubitUnitary(Qureg qureg, int ctrl, int* targets, int numTargets, ComplexMatrixN u) {
     
     long long int ctrlMask = 1LL << ctrl;
     statevec_multiControlledMultiQubitUnitary(qureg, ctrlMask, targets, numTargets, u);
@@ -727,6 +782,154 @@ void densmatr_mixPauli(Qureg qureg, int qubit, qreal probX, qreal probY, qreal p
     ops[3].real[0][0] =  facs[3]; ops[3].real[1][1] = -facs[3];
     
     densmatr_mixKrausMap(qureg, qubit, ops, numOps);
+}
+
+void applyExponentiatedPauliHamil(Qureg qureg, PauliHamil hamil, qreal fac, int reverse) {
+    
+    /* applies a first-order one-repetition approximation of exp(-i fac H)
+     * to qureg. Letting H = sum_j c_j h_j, it does this via 
+     * exp(-i fac H) ~ prod_j exp(-i fac c_j h_j), where each inner exp 
+     * is performed with multiRotatePauli (with pre-factor 2).
+     */
+     
+    // prepare targets for multiRotatePauli 
+    // (all qubits; actual targets are determined by Pauli codes)
+    int vecTargs[hamil.numQubits];
+    int densTargs[hamil.numQubits];
+    for (int q=0; q<hamil.numQubits; q++) {
+        vecTargs[q] = q;
+        densTargs[q] = q + hamil.numQubits;
+    }
+
+    for (int i=0; i<hamil.numSumTerms; i++) {
+        
+        int t=i;
+        if (reverse)
+            t=hamil.numSumTerms-1-i;
+            
+        qreal angle = 2*fac*hamil.termCoeffs[t];
+        
+        statevec_multiRotatePauli(
+            qureg, vecTargs, &(hamil.pauliCodes[t*hamil.numQubits]), 
+            hamil.numQubits, angle, 0);
+        
+        if (qureg.isDensityMatrix)
+            statevec_multiRotatePauli(
+                qureg, densTargs, &(hamil.pauliCodes[t*hamil.numQubits]), 
+                hamil.numQubits, angle, 1);
+        
+        // record qasm      
+        char buff[1024];
+        int b=0;
+        for (int q=0; q<hamil.numQubits; q++) {
+            enum pauliOpType op = hamil.pauliCodes[q + t*hamil.numQubits];
+            
+            char p = 'I';
+            if (op == PAULI_X) p = 'X';
+            if (op == PAULI_Y) p = 'Y';
+            if (op == PAULI_Z) p = 'Z';
+            buff[b++] = p;
+            buff[b++] = ' ';
+        }
+        buff[b] = '\0';
+        
+        qasm_recordComment(qureg, 
+            "Here, a multiRotatePauli with angle %g and paulis %s was applied.",
+            angle, buff);
+    }
+}
+
+void applySymmetrizedTrotterCircuit(Qureg qureg, PauliHamil hamil, qreal time, int order) {
+    
+    if (order == 1) {
+        applyExponentiatedPauliHamil(qureg, hamil, time, 0);
+    }
+    else if (order == 2) {
+        applyExponentiatedPauliHamil(qureg, hamil, time/2., 0);
+        applyExponentiatedPauliHamil(qureg, hamil, time/2., 1);
+    }
+    else {
+        qreal p = 1. / (4 - pow(4, 1./(order-1)));
+        int lower = order-2;
+        applySymmetrizedTrotterCircuit(qureg, hamil, p*time, lower);
+        applySymmetrizedTrotterCircuit(qureg, hamil, p*time, lower);
+        applySymmetrizedTrotterCircuit(qureg, hamil, (1-4*p)*time, lower);
+        applySymmetrizedTrotterCircuit(qureg, hamil, p*time, lower);
+        applySymmetrizedTrotterCircuit(qureg, hamil, p*time, lower);
+    }
+}
+
+void agnostic_applyTrotterCircuit(Qureg qureg, PauliHamil hamil, qreal time, int order, int reps) {
+    
+    if (time == 0)
+        return;
+    
+    for (int r=0; r<reps; r++)
+        applySymmetrizedTrotterCircuit(qureg, hamil, time/reps, order);
+}
+
+void agnostic_applyQFT(Qureg qureg, int* qubits, int numQubits) {
+    
+    int densShift = qureg.numQubitsRepresented;
+    
+    // start with top/left-most qubit, work down
+    for (int q=numQubits-1; q >= 0; q--) {
+        
+        // H
+        statevec_hadamard(qureg, qubits[q]);
+        if (qureg.isDensityMatrix)
+            statevec_hadamard(qureg, qubits[q] + densShift);
+        qasm_recordGate(qureg, GATE_HADAMARD, qubits[q]);
+        
+        if (q == 0)
+            break;
+        
+        // succession of C-phases, control on qubits[q], targeting each of 
+        // qubits[q-1], qubits[q-1], ... qubits[0]. This can be expressed by 
+        // a single invocation of applyNamedPhaseFunc product
+        
+        int numRegs = 2;
+        int numQubitsPerReg[2] = {q, 1};
+        int regs[q+1];
+        for (int i=0; i<q+1; i++)
+            regs[i] = qubits[i]; // qubits[q] is in own register
+        
+        int numParams = 1;
+        qreal params[1] = { M_PI / (1 << q) };
+        
+        int conj = 0;
+        statevec_applyParamNamedPhaseFuncOverrides(
+            qureg, regs, numQubitsPerReg, numRegs, 
+            UNSIGNED, SCALED_PRODUCT, params, numParams, 
+            NULL, NULL, 0, 
+            conj);
+        if (qureg.isDensityMatrix) {
+            conj = 1;
+            shiftSubregIndices(regs, numQubitsPerReg, numRegs, densShift);
+            statevec_applyParamNamedPhaseFuncOverrides(
+                qureg, regs, numQubitsPerReg, numRegs, 
+                UNSIGNED, SCALED_PRODUCT, params, numParams, 
+                NULL, NULL, 0, 
+                conj);
+            shiftSubregIndices(regs, numQubitsPerReg, numRegs, - densShift);
+        }
+        qasm_recordNamedPhaseFunc(
+            qureg, regs, numQubitsPerReg, numRegs, 
+            UNSIGNED, SCALED_PRODUCT, params, numParams, 
+            NULL, NULL, 0);
+    }
+    
+    // final swaps
+    for (int i=0; i<(numQubits/2); i++) {
+        
+        int qb1 = qubits[i];
+        int qb2 = qubits[numQubits-i-1];
+                
+        statevec_swapQubitAmps(qureg, qb1, qb2);
+        if (qureg.isDensityMatrix)
+            statevec_swapQubitAmps(qureg, qb1 + densShift, qb2 + densShift);
+        qasm_recordControlledGate(qureg, GATE_SWAP, qb1, qb2);
+    }
 }
 
 #ifdef __cplusplus

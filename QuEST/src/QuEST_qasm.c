@@ -29,13 +29,12 @@
 # define CTRL_LABEL_PREF "c"    // QASM syntax which prefixes gates when controlled
 # define MEASURE_CMD "measure"  // QASM cmd for measurement operation
 # define INIT_ZERO_CMD "reset"  // QASM cmd for setting state 0
-# define COMMENT_PREF "//"      // QASM syntax for a comment ;)
+# define COMMENT_PREF "//"     // QASM syntax for a comment ;)
 
-# define MAX_LINE_LEN 200       // maximum length (#chars) of a single QASM instruction
-# define BUF_INIT_SIZE 1000     // initial size of the QASM buffer (#chars)
+# define MAX_LINE_LEN 1024       // maximum length (#chars) of a single QASM instruction
+# define BUF_INIT_SIZE 1024     // initial size of the QASM buffer (#chars)
 # define BUF_GROW_FAC 2         // growth factor when buffer dynamically resizes
-
-#define MAX_REG_SYMBS 24        // maximum number of single-char symbols in phase function QASM
+# define MAX_REG_SYMBS 24        // maximum number of single-char symbols in phase function QASM
 
 static const char* qasmGateLabels[] = {
     [GATE_SIGMA_X] = "x",
@@ -222,7 +221,7 @@ void qasm_recordUnitary(Qureg qureg, ComplexMatrix2 u, int targetQubit) {
     addGateToQASM(qureg, GATE_UNITARY, NULL, 0, targetQubit, params, 3);
 }
 
-void qasm_recordAxisRotation(Qureg qureg, qreal angle, Vector axis, const int targetQubit) {
+void qasm_recordAxisRotation(Qureg qureg, qreal angle, Vector axis, int targetQubit) {
     
     if (!qureg.qasmLog->isLogging)
         return;
@@ -315,7 +314,7 @@ void qasm_recordControlledAxisRotation(Qureg qureg, qreal angle, Vector axis, in
     addGateToQASM(qureg, GATE_UNITARY, controls, 1, targetQubit, params, 3);
 }
 
-void qasm_recordMultiControlledGate(Qureg qureg, TargetGate gate, int* controlQubits, const int numControlQubits, const int targetQubit) {
+void qasm_recordMultiControlledGate(Qureg qureg, TargetGate gate, int* controlQubits, int numControlQubits, int targetQubit) {
 
     if (!qureg.qasmLog->isLogging)
         return;
@@ -323,7 +322,7 @@ void qasm_recordMultiControlledGate(Qureg qureg, TargetGate gate, int* controlQu
     addGateToQASM(qureg, gate, controlQubits, numControlQubits, targetQubit, NULL, 0);
 }
 
-void qasm_recordMultiControlledParamGate(Qureg qureg, TargetGate gate, int* controlQubits, const int numControlQubits, const int targetQubit, qreal param) {
+void qasm_recordMultiControlledParamGate(Qureg qureg, TargetGate gate, int* controlQubits, int numControlQubits, int targetQubit, qreal param) {
     
     if (!qureg.qasmLog->isLogging)
         return;
@@ -340,7 +339,7 @@ void qasm_recordMultiControlledParamGate(Qureg qureg, TargetGate gate, int* cont
 }
 
 /** additionally performs Rz on target to restore the global phase lost from u in QASM U(a,b,c) */
-void qasm_recordMultiControlledUnitary(Qureg qureg, ComplexMatrix2 u, int* controlQubits, const int numControlQubits, const int targetQubit) {
+void qasm_recordMultiControlledUnitary(Qureg qureg, ComplexMatrix2 u, int* controlQubits, int numControlQubits, int targetQubit) {
     
     if (!qureg.qasmLog->isLogging)
         return;
@@ -362,7 +361,7 @@ void qasm_recordMultiControlledUnitary(Qureg qureg, ComplexMatrix2 u, int* contr
 }
 
 void qasm_recordMultiStateControlledUnitary(
-    Qureg qureg, ComplexMatrix2 u, int* controlQubits, int* controlState, const int numControlQubits, const int targetQubit
+    Qureg qureg, ComplexMatrix2 u, int* controlQubits, int* controlState, int numControlQubits, int targetQubit
 ) {
     if (!qureg.qasmLog->isLogging)
         return;
@@ -380,8 +379,20 @@ void qasm_recordMultiStateControlledUnitary(
             addGateToQASM(qureg, GATE_SIGMA_X, NULL, 0, controlQubits[i], NULL, 0);
 }
 
+void qasm_recordMultiControlledMultiQubitNot(Qureg qureg, int* ctrls, int numCtrls, int* targs, int numTargs) {
+    
+    if (!qureg.qasmLog->isLogging)
+        return;
+    
+    qasm_recordComment(qureg, "The following %d gates resulted from a single %s() call", numTargs,
+        (numCtrls > 0)? "multiControlledMultiQubitNot" : "multiQubitNot");
+    
+    for (int t=0; t<numTargs; t++)
+        addGateToQASM(qureg, GATE_SIGMA_X, ctrls, numCtrls, targs[t], NULL, 0);
+}
+
 /* not actually used, D'Oh!
-void qasm_recordMultiControlledAxisRotation(Qureg qureg, qreal angle, Vector axis, int* controlQubits, const int numControlQubits, const int targetQubit) {
+void qasm_recordMultiControlledAxisRotation(Qureg qureg, qreal angle, Vector axis, int* controlQubits, int numControlQubits, int targetQubit) {
     
     if (!qureg.qasmLog->isLogging)
         return;
@@ -397,7 +408,7 @@ void qasm_recordMultiControlledAxisRotation(Qureg qureg, qreal angle, Vector axi
 }
 */
 
-void qasm_recordMeasurement(Qureg qureg, const int measureQubit) {
+void qasm_recordMeasurement(Qureg qureg, int measureQubit) {
 
     if (!qureg.qasmLog->isLogging)
         return;
@@ -477,52 +488,62 @@ void qasm_recordInitClassical(Qureg qureg, long long int stateInd) {
 }
 
 void qasm_recordPhaseFunc(Qureg qureg, int* qubits, int numQubits, enum bitEncoding encoding, qreal* coeffs, qreal* exponents, int numTerms, long long int* overrideInds, qreal* overridePhases, int numOverrides) {
-    
+
     if (!qureg.qasmLog->isLogging)
         return;
-    
+
     qasm_recordComment(qureg, "Here, applyPhaseFunc() multiplied a complex scalar of the form");
-    
+
     // record like: 
     //     exp(i (-.5 x^2 + .5 x^(-1.5) - 1.3 x^4 ))
     char line[MAX_LINE_LEN+1];
     int len = snprintf(line, MAX_LINE_LEN, "//     exp(i (");
     for (int t=0; t<numTerms; t++) {
-        len += snprintf(line+len, MAX_LINE_LEN-len, (exponents[t] > 0)? "%g x^%g":"%g x^(%g)", (t>0)? absReal(coeffs[t]):coeffs[t], exponents[t]);
+        len += snprintf(line+len, MAX_LINE_LEN-len, 
+                (exponents[t] > 0)? 
+                    (REAL_QASM_FORMAT " x^" REAL_QASM_FORMAT) : 
+                    (REAL_QASM_FORMAT " x^(" REAL_QASM_FORMAT ")"), 
+                (t>0)? 
+                    absReal(coeffs[t]) : 
+                    coeffs[t], 
+                exponents[t]);
         if (t < numTerms-1)
             len += snprintf(line+len, MAX_LINE_LEN-len, (coeffs[t+1] > 0)? " + ":" - ");
     }
     len += snprintf(line+len, MAX_LINE_LEN-len, "))\n");
-    
+
     if (len >= MAX_LINE_LEN)
         bufferOverflow();
     addStringToQASM(qureg, line, len);
-    
+
     char encBuf[MAX_LINE_LEN];
     if (encoding == UNSIGNED)           sprintf(encBuf, "an unsigned");
     if (encoding == TWOS_COMPLEMENT)    sprintf(encBuf, "a two's complement");
     qasm_recordComment(qureg, "  upon every substate |x>, informed by qubits (under %s binary encoding)", encBuf);
-    
+
     // record like:
     //     {0, 3, 2}
     len=0;
     len = snprintf(line, MAX_LINE_LEN, "//     {");
     for (int q=0; q<numQubits; q++)
         len += snprintf(line+len, MAX_LINE_LEN-len, (q < numQubits-1)? "%d, ":"%d}\n", qubits[q]);
-    
+
     if (len >= MAX_LINE_LEN)
         bufferOverflow();
     addStringToQASM(qureg, line, len);
-    
+
     if (numOverrides > 0) {
         // optionally record like:
         //      |0> -> exp(i .45)
         //      |1> -> exp(i (-.5))
         qasm_recordComment(qureg, "  though with overrides");
         for (int v=0; v<numOverrides; v++)
-            qasm_recordComment(qureg, (overridePhases[v] >= 0)? "    |%lld> -> exp(i %g)":"    |%lld> -> exp(i (%g))", overrideInds[v], overridePhases[v]);
+            qasm_recordComment(qureg, (overridePhases[v] >= 0)? 
+                "    |%lld> -> exp(i " REAL_QASM_FORMAT ")" :
+                "    |%lld> -> exp(i (" REAL_QASM_FORMAT "))", 
+                overrideInds[v], overridePhases[v]);
     }
-    
+
     // Here, applyPhaseFunction() multiplied a complex scalar of the form
     //      exp(i (.5 x^2 + .5 x^(-1.5) - 1.3 x^4 ))
     // upon every sub-state |x>, informed by qubits
@@ -533,27 +554,27 @@ void qasm_recordPhaseFunc(Qureg qureg, int* qubits, int numQubits, enum bitEncod
 }
 
 char getPhaseFuncSymbol(int numSymbs, int ind) {
-    
+
     static char xyz[7] = {'x', 'y', 'z', 't', 'r', 'v', 'u'};
     if (numSymbs <= 7)
         return xyz[ind];
-        
+
     static char abc[MAX_REG_SYMBS] = {'a','b','c','d','e','f','g','h','j','k','l','m','n','p','q','r','s','t','u','v','w','x','y','z'}; // no i or o
     if (numSymbs <= MAX_REG_SYMBS)
         return abc[ind];
-    
+
     // we should never reach here, since caller should handle when numSymbs > 24
     bufferOverflow();
     return 'x';
 }
 
 void addMultiVarRegsToQASM(Qureg qureg, int* qubits, int* numQubitsPerReg, int numRegs, enum bitEncoding encoding) {
-    
+
     char encBuf[MAX_LINE_LEN];
     if (encoding == UNSIGNED)           sprintf(encBuf, "an unsigned");
     if (encoding == TWOS_COMPLEMENT)    sprintf(encBuf, "a two's complement");
     qasm_recordComment(qureg, "  upon substates informed by qubits (under %s binary encoding)", encBuf);
-    
+
     char line[MAX_LINE_LEN+1];
     int len = 0;
 
@@ -569,7 +590,7 @@ void addMultiVarRegsToQASM(Qureg qureg, int* qubits, int* numQubitsPerReg, int n
             len += snprintf(line+len, MAX_LINE_LEN-len, "//     |x%d> = {", r);
         for (int q=0; q<numQubitsPerReg[r]; q++)
             len += snprintf(line+len, MAX_LINE_LEN-len, (q < numQubitsPerReg[r]-1)? "%d, ":"%d}\n", qubits[qInd++]);
-            
+
         if (len >= MAX_LINE_LEN)
             bufferOverflow();
         addStringToQASM(qureg, line, len);
@@ -577,12 +598,12 @@ void addMultiVarRegsToQASM(Qureg qureg, int* qubits, int* numQubitsPerReg, int n
 }
 
 void addMultiVarOverridesToQASM(Qureg qureg, int numRegs, long long int* overrideInds, qreal* overridePhases, int numOverrides) {
-    
+
     qasm_recordComment(qureg, "  though with overrides");
-    
+
     char line[MAX_LINE_LEN+1];
     int len = 0;
-    
+
     // record like:
     //       |x=0, y=1, z=2> -> exp(i .45)
     //       |x=0, y=1, z=5> -> exp(i (-.5))
@@ -592,112 +613,253 @@ void addMultiVarOverridesToQASM(Qureg qureg, int numRegs, long long int* overrid
         len += snprintf(line+len, MAX_LINE_LEN-len, "//     |");
         for (int r=0; r<numRegs; r++) {
             if (numRegs <= MAX_REG_SYMBS)
-                len += snprintf(line+len, MAX_LINE_LEN-len, (r<numRegs-1)? "%c=%lld, ":"%c=%lld>", getPhaseFuncSymbol(numRegs,r), overrideInds[vInd++]);
+                len += snprintf(line+len, MAX_LINE_LEN-len, 
+                    (r<numRegs-1)? 
+                        "%c=%lld, " : 
+                        "%c=%lld>", 
+                    getPhaseFuncSymbol(numRegs,r), 
+                    overrideInds[vInd++]);
             else
-                len += snprintf(line+len, MAX_LINE_LEN-len, (r<numRegs-1)? "x%d=%lld, ":"x%d=%lld>",r, overrideInds[vInd++]);
+                len += snprintf(line+len, MAX_LINE_LEN-len, 
+                    (r<numRegs-1)? 
+                        "x%d=%lld, " : 
+                        "x%d=%lld>",
+                    r,
+                    overrideInds[vInd++]);
         }
-        len += snprintf(line+len, MAX_LINE_LEN-len, (overridePhases[v] >= 0)? " -> exp(i %g)\n" : " -> exp(i (%g))\n", overridePhases[v]);
-        
+        len += snprintf(line+len, MAX_LINE_LEN-len, 
+            (overridePhases[v] >= 0)? 
+                " -> exp(i " REAL_QASM_FORMAT ")\n" : 
+                " -> exp(i (" REAL_QASM_FORMAT "))\n", 
+                overridePhases[v]);
+
         if (len >= MAX_LINE_LEN)
             bufferOverflow();
         addStringToQASM(qureg, line, len);
     }
 }
 
-                                                                                            // TODO: parse encoding
+void addShiftValuesToQASM(Qureg qureg, enum phaseFunc funcName, int numRegs, qreal* params) {
+
+    char line[MAX_LINE_LEN+1];
+    int len = 0;
+    int numDeltas;
+    if (funcName == SCALED_INVERSE_SHIFTED_NORM)
+        numDeltas = numRegs;
+    else if (funcName == SCALED_INVERSE_SHIFTED_DISTANCE)
+        numDeltas = numRegs / 2;
+    else
+        return;
+
+    qasm_recordComment(qureg, "  with the additional parameters");
+
+    for (int k=0; k<numDeltas; k++) {
+        len = 0;
+        len += snprintf(line+len, MAX_LINE_LEN-len, "//     delta%d = " REAL_QASM_FORMAT "\n", k, params[2+k]);
+        if (len >= MAX_LINE_LEN)
+            bufferOverflow();
+        addStringToQASM(qureg, line, len);
+    }
+
+}
+
 void qasm_recordMultiVarPhaseFunc(Qureg qureg, int* qubits, int* numQubitsPerReg, int numRegs, enum bitEncoding encoding, qreal* coeffs, qreal* exponents, int* numTermsPerReg, long long int* overrideInds, qreal* overridePhases, int numOverrides) {
-    
+
     if (!qureg.qasmLog->isLogging)
         return;
-    
+
     qasm_recordComment(qureg, "Here, applyMultiVarPhaseFunc() multiplied a complex scalar of the form");
-    
+
     // Here, applyMultiVarPhaseFunction() multiplied a complex scalar of the form 
     //     exp(i (
     //         .5 x^2 + .6 x + x 
     //         - y^2 - 5 y - y
     //         + z^2 + z^3 ))
-    
+
     qasm_recordComment(qureg, "    exp(i (");
     char line[MAX_LINE_LEN+1];
     int len=0;
-    
+
     int tFlatInd = 0;
     for (int r=0; r<numRegs; r++) {
         len = snprintf(line, MAX_LINE_LEN, "//         ");
-        
+
         // manually force sign of first term
         len += snprintf(line+len, MAX_LINE_LEN-len, (coeffs[tFlatInd] > 0)? " + ":" - ");
-        
+
         for (int t=0; t<numTermsPerReg[r]; t++) {
             if (numRegs <= MAX_REG_SYMBS)
                 len += snprintf(line+len, MAX_LINE_LEN-len, 
-                    (exponents[tFlatInd] > 0)? "%g %c^%g":"%g %c^(%g)", 
-                    absReal(coeffs[tFlatInd]), getPhaseFuncSymbol(numRegs,r), exponents[tFlatInd]);
+                    (exponents[tFlatInd] > 0)? 
+                        REAL_QASM_FORMAT " %c^" REAL_QASM_FORMAT : 
+                        REAL_QASM_FORMAT " %c^(" REAL_QASM_FORMAT ")", 
+                    absReal(coeffs[tFlatInd]), 
+                    getPhaseFuncSymbol(numRegs,r), 
+                    exponents[tFlatInd]);
             else
                 len += snprintf(line+len, MAX_LINE_LEN-len, 
-                    (exponents[tFlatInd] > 0)? "%g x%d^%g":"%g x%d^(%g)", 
+                    (exponents[tFlatInd] > 0)? 
+                        REAL_QASM_FORMAT " x%d^" REAL_QASM_FORMAT : 
+                        REAL_QASM_FORMAT " x%d^(" REAL_QASM_FORMAT ")", 
                     absReal(coeffs[tFlatInd]), r, exponents[tFlatInd]);
             if (t < numTermsPerReg[r]-1)
                 len += snprintf(line+len, MAX_LINE_LEN-len, (coeffs[tFlatInd+1] > 0)? " + ":" - ");                
             tFlatInd++;
         }
-        
+
         if (r < numRegs-1)
             len += snprintf(line+len, MAX_LINE_LEN-len, "\n");
         else
             len += snprintf(line+len, MAX_LINE_LEN-len, " ))\n");
-        
+
         if (len >= MAX_LINE_LEN)
             bufferOverflow();
         addStringToQASM(qureg, line, len);
     }
-    
+
     addMultiVarRegsToQASM(qureg, qubits, numQubitsPerReg, numRegs, encoding);
-    
+
     if (numOverrides > 0)
         addMultiVarOverridesToQASM(qureg, numRegs, overrideInds, overridePhases, numOverrides);
 }
 
-                                                                                           // TODO: parse encoding
 void qasm_recordNamedPhaseFunc(Qureg qureg, int* qubits, int* numQubitsPerReg, int numRegs, enum bitEncoding encoding, enum phaseFunc funcName, qreal* params, int numParams, long long int* overrideInds, qreal* overridePhases, int numOverrides) {
-    
+    // I apologise to my future self and my esteemed readers for such terrible code
+
     if (!qureg.qasmLog->isLogging)
         return;
-    
+
     qasm_recordComment(qureg, "Here, applyNamedPhaseFunc() multiplied a complex scalar of form");
     char line[MAX_LINE_LEN+1];
-    
-    // record like
-    //      exp(i sqrt(x^2 + y^2 + z^2)) or exp(i sqrt(x0^2 + x1^2 + ...))
+
     int len = snprintf(line, MAX_LINE_LEN, "//     exp(i ");
-    
-    // record norm-based function
+
+    // record norm-based function, like:  (-1.0) / sqrt(x^2 + y^2 + z^2 + ...)
     if (funcName == NORM || funcName == SCALED_NORM || 
-        funcName == INVERSE_NORM || funcName == SCALED_INVERSE_NORM)
+        funcName == INVERSE_NORM || funcName == SCALED_INVERSE_NORM ||
+        funcName == SCALED_INVERSE_SHIFTED_NORM)
     {
-        if (funcName == SCALED_NORM || funcName == SCALED_INVERSE_NORM)
-            len += snprintf(line+len, MAX_LINE_LEN-len, (params[0]>0)? "%g ":"(%g) ", params[0]);
+        // coefficient
+        if (funcName == SCALED_NORM || funcName == SCALED_INVERSE_NORM || funcName == SCALED_INVERSE_SHIFTED_NORM)
+            len += snprintf(line+len, MAX_LINE_LEN-len, 
+                (params[0]>0)? 
+                    REAL_QASM_FORMAT " " : 
+                    "(" REAL_QASM_FORMAT ") ", 
+                params[0]);
+
+        // sqrt(
         if (funcName == NORM || funcName == SCALED_NORM)
             len += snprintf(line+len, MAX_LINE_LEN-len, "sqrt(");
-        else if (funcName == INVERSE_NORM || funcName == SCALED_INVERSE_NORM)
-            len += snprintf(line+len, MAX_LINE_LEN-len, "1/sqrt(");
+        else if (funcName == INVERSE_NORM)
+            len += snprintf(line+len, MAX_LINE_LEN-len, "1 / sqrt(");
+        else if (funcName == SCALED_INVERSE_NORM || funcName == SCALED_INVERSE_SHIFTED_NORM)
+            len += snprintf(line+len, MAX_LINE_LEN-len, "/ sqrt(");
+
+        // x^2 + y^2 + ...
+        if (numRegs <= MAX_REG_SYMBS)
+            for (int r=0; r<numRegs; r++) {
+                if (funcName == SCALED_INVERSE_SHIFTED_NORM)
+                    len += snprintf(line+len, MAX_LINE_LEN-len,
+                        (params[2+r] < 0)?
+                            "(%c^2+" REAL_QASM_FORMAT ")" :
+                            "(%c^2-" REAL_QASM_FORMAT ")",
+                        getPhaseFuncSymbol(numRegs,r), fabs(params[2+r]));
+                else
+                    len += snprintf(line+len, MAX_LINE_LEN-len, "%c^2", getPhaseFuncSymbol(numRegs,r));
+                len += snprintf(line+len, MAX_LINE_LEN-len, (r < numRegs - 1)? " + ":"))\n");
+            }
+        else {
+            if (funcName == SCALED_INVERSE_SHIFTED_NORM)
+                len += snprintf(line+len, MAX_LINE_LEN-len, "(x0-delta0)^2 + (x1-delta1)^2 + (x2-delta2)^2... ))\n");
+            else
+                len += snprintf(line+len, MAX_LINE_LEN-len, "x0^2 + x1^2 + x2^2... ))\n");
+        }
+    }
+    // record product-based, like (-1.0) 1/(x y z) ...
+    else if (funcName == PRODUCT || funcName == SCALED_PRODUCT || 
+        funcName == INVERSE_PRODUCT || funcName == SCALED_INVERSE_PRODUCT)
+    {
+        // coefficient
+        if (funcName == SCALED_PRODUCT || funcName == SCALED_INVERSE_PRODUCT)
+            len += snprintf(line+len, MAX_LINE_LEN-len, 
+                (params[0]>0)? 
+                    REAL_QASM_FORMAT " ":
+                    "(" REAL_QASM_FORMAT ") ", 
+                params[0]);
+
+        // reciprocal
+        if (funcName == INVERSE_PRODUCT)
+            len += snprintf(line+len, MAX_LINE_LEN-len, "1 / (");
+        else if (funcName == SCALED_INVERSE_PRODUCT)
+            len += snprintf(line+len, MAX_LINE_LEN-len, "/ (");
+
+        // x y z ...
         if (numRegs <= MAX_REG_SYMBS)
             for (int r=0; r<numRegs; r++)
-                len += snprintf(line+len, MAX_LINE_LEN-len, (r < numRegs - 1)? "%c^2 + ":"%c^2))\n", getPhaseFuncSymbol(numRegs,r));
+                len += snprintf(line+len, MAX_LINE_LEN-len, (r < numRegs - 1)? "%c ":"%c)", getPhaseFuncSymbol(numRegs,r));
         else
-            len += snprintf(line+len, MAX_LINE_LEN-len, "x0^2 + x1^2 + x2^2... ))\n");
+            len += snprintf(line+len, MAX_LINE_LEN-len, "x0 x1 x2 ...)");
+
+        // close reciprocal brackets
+        if (funcName == INVERSE_PRODUCT || funcName == SCALED_INVERSE_PRODUCT)
+            len += snprintf(line+len, MAX_LINE_LEN-len, ")");
+        len += snprintf(line+len, MAX_LINE_LEN-len, "\n");
     }
-    
+    // record distance-based, like (-1.0) 1/sqrt((x1-x2)^2 + (y1-y2)^2 + ...)
+    else if (funcName == DISTANCE || funcName == SCALED_DISTANCE || 
+        funcName == INVERSE_DISTANCE || funcName == SCALED_INVERSE_DISTANCE ||
+        funcName == SCALED_INVERSE_SHIFTED_DISTANCE)
+    {
+        // coefficient
+        if (funcName == SCALED_DISTANCE || funcName == SCALED_INVERSE_DISTANCE || funcName == SCALED_INVERSE_SHIFTED_DISTANCE)
+            len += snprintf(line+len, MAX_LINE_LEN-len, 
+                (params[0]>0)? 
+                    REAL_QASM_FORMAT " " :
+                    "(" REAL_QASM_FORMAT ") ", 
+                params[0]);
+
+        // sqrt(
+        if (funcName == DISTANCE || funcName == SCALED_DISTANCE)
+            len += snprintf(line+len, MAX_LINE_LEN-len, "sqrt(");
+        else if (funcName == INVERSE_DISTANCE)
+            len += snprintf(line+len, MAX_LINE_LEN-len, "1 / sqrt(");
+        else if (funcName == SCALED_INVERSE_DISTANCE || funcName == SCALED_INVERSE_SHIFTED_DISTANCE)
+            len += snprintf(line+len, MAX_LINE_LEN-len, "/ sqrt(");
+
+        // (x-y)^2 + (z-t)^2 + ...
+        if (numRegs <= MAX_REG_SYMBS)
+            for (int r=0; r<numRegs; r+=2) {
+                if (funcName == SCALED_INVERSE_SHIFTED_DISTANCE)
+                    len += snprintf(line+len, MAX_LINE_LEN-len,
+                        (params[2+r/2] < 0)?
+                            "(%c-%c+" REAL_QASM_FORMAT ")^2":
+                            "(%c-%c-" REAL_QASM_FORMAT ")^2", 
+                        getPhaseFuncSymbol(numRegs,r), getPhaseFuncSymbol(numRegs,r+1), fabs(params[2+r/2]));
+                else
+                    len += snprintf(line+len, MAX_LINE_LEN-len, "(%c-%c)^2", 
+                        getPhaseFuncSymbol(numRegs,r), getPhaseFuncSymbol(numRegs,r+1));
+                len += snprintf(line+len, MAX_LINE_LEN-len, (r+1 < numRegs-1)? " + ":"))\n");
+            }
+        else {
+            if (funcName == SCALED_INVERSE_SHIFTED_DISTANCE)
+                len += snprintf(line+len, MAX_LINE_LEN-len, "(x0-x1-delta0)^2 + (x2-x3-delta1)^2 + ...))\n");
+            else
+                len += snprintf(line+len, MAX_LINE_LEN-len, "(x0-x1)^2 + (x2-x3)^2 + ...))\n");
+        }
+    }
+
     if (len >= MAX_LINE_LEN)
         bufferOverflow();
     addStringToQASM(qureg, line, len);
-    
+
     addMultiVarRegsToQASM(qureg, qubits, numQubitsPerReg, numRegs, encoding);
-    
+    if (numRegs > MAX_REG_SYMBS && (funcName == SCALED_INVERSE_SHIFTED_NORM || funcName == SCALED_INVERSE_SHIFTED_DISTANCE))
+        addShiftValuesToQASM(qureg, funcName, numRegs, params);
+
     if (numOverrides > 0)
         addMultiVarOverridesToQASM(qureg, numRegs, overrideInds,overridePhases, numOverrides);
 }
+
 
 void qasm_clearRecorded(Qureg qureg) {
     

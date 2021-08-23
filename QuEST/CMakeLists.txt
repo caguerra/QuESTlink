@@ -19,6 +19,8 @@
 # eg
 #   cmake -DDISTRIBUTED=1 ..
 
+cmake_minimum_required(VERSION 3.7)
+project(QuEST_Library)
 
 option(MULTITHREADED "Switches on OpenMP Threading if an OpenMP implementation can be found. Set to 0 to disable." 1)
 
@@ -38,6 +40,7 @@ set(GPU_COMPUTE_CAPABILITY 30 CACHE STRING "GPU hardware dependent, lookup at ht
 # *****************************************************************************
 
 # Show the user their settings
+message(STATUS "Precision is ${PRECISION}")
 message(STATUS "GPU acceleration is ${GPUACCELERATED}")
 message(STATUS "OMP acceleration is ${MULTITHREADED}")
 message(STATUS "MPI distribution is ${DISTRIBUTED}")
@@ -125,12 +128,25 @@ endif()
 # ----- OPENMP ----------------------------------------------------------------
 
 if (${MULTITHREADED} AND NOT ${GPUACCELERATED})
-    find_package(OpenMP)
-    if (OPENMP_FOUND)
-        set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
-        set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
-    endif()
-endif()
+  find_package(OpenMP)
+
+  # If found, we must also check the version
+  if (OPENMP_FOUND)
+    # Version number is not cached, and we need to test for old versions
+    set(OpenMP_C_VERSION ${OpenMP_C_VERSION} CACHE STRING "OpenMP C version")
+
+    # MSVC, for instance, only implements OpenMP 2.0 (as of 2019)
+    if (OpenMP_C_VERSION VERSION_LESS "3.1")  # todo find the real minimum required
+      set(MULTITHREADED 0)
+      message(WARNING "Found OpenMP ${OpenMP_C_VERSION} but this is too \
+             old. Turning OpenMP support OFF.")
+    else ()
+      set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+    endif ()
+  endif ()
+
+endif ()
 
 # ----- CUDA FLAGS ------------------------------------------------------------
 
@@ -142,8 +158,7 @@ if (GPUACCELERATED)
         set (CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} \
             -O2"
         )
-    endif()
-    if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
+    elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
         set (CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} \
             -G -g -lineinfo"
         )
@@ -295,7 +310,7 @@ target_include_directories(QuEST
 # ----- Definitions -----------------------------------------------------------
 
 target_compile_definitions(QuEST
-    PRIVATE
+    PUBLIC
     QuEST_PREC=${PRECISION}
 )
 
@@ -303,13 +318,45 @@ target_compile_definitions(QuEST
 # ----- LINK LIBRARY ---------------------------------------------------------
 # -----------------------------------------------------------------------------
 
+# ----- OMP -------------------------------------------------------------------
+
+if (MULTITHREADED AND OPENMP_FOUND)
+  target_link_libraries(QuEST PUBLIC OpenMP::OpenMP_C)
+endif ()
+
 # ----- MPI -------------------------------------------------------------------
 
-target_link_libraries(QuEST ${MPI_C_LIBRARIES})
+target_link_libraries(QuEST PUBLIC ${MPI_C_LIBRARIES})
 
 # ----- GPU -------------------------------------------------------------------
 
 target_link_libraries(QuEST ${CUDA_LIBRARIES})
 
 
+# ----- Coverage testing with GCC or Clang ------------------------------------
+option(QUEST_ENABLE_COVERAGE "Enable coverage reporting for GCC or Clang" FALSE)
+if (QUEST_ENABLE_COVERAGE)
+  if (${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU" OR ${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang")
+    message(STATUS "Configuring with coverage")
+    target_compile_options(QuEST PUBLIC --coverage -O0)
+    target_link_libraries(QuEST PUBLIC --coverage)
+  else()
+    message(FATAL_ERROR "GCC or Clang required with QUEST_ENABLE_COVERAGE: found ${CMAKE_CXX_COMPILER_ID}")
+  endif()
+endif()
 
+# ----- Memory testing with LLVM Clang ----------------------------------------
+option(QUEST_MEMCHECK "Use LLVM AddressSanitizer to detecting memory errors" OFF)
+if (QUEST_MEMCHECK)
+  if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    message(STATUS "Configuring with LLVM AddressSanitizer")
+    set(QUEST_MEMCHECK_FLAGS -fno-optimize-sibling-calls
+        -fsanitize=address
+        -fsanitize-address-use-after-scope
+        )
+    target_compile_options(QuEST PUBLIC -O1 -g -fno-omit-frame-pointer ${QUEST_MEMCHECK_FLAGS})
+    target_link_libraries(QuEST PUBLIC -g ${QUEST_MEMCHECK_FLAGS})
+  else()
+    message(FATAL_ERROR "clang compiler required with QUEST_MEMCHECK: found ${CMAKE_CXX_COMPILER_ID}")
+  endif()
+endif()

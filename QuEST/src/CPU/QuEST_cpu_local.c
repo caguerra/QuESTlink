@@ -27,14 +27,14 @@
 # endif
 
 
-void densmatr_mixDepolarising(Qureg qureg, const int targetQubit, qreal depolLevel) {
+void densmatr_mixDepolarising(Qureg qureg, int targetQubit, qreal depolLevel) {
     if (depolLevel == 0)
         return;
 
     densmatr_mixDepolarisingLocal(qureg, targetQubit, depolLevel);
 }
 
-void densmatr_mixDamping(Qureg qureg, const int targetQubit, qreal damping) {
+void densmatr_mixDamping(Qureg qureg, int targetQubit, qreal damping) {
     if (damping == 0)
         return;
 
@@ -55,6 +55,7 @@ void densmatr_mixTwoQubitDepolarising(Qureg qureg, int qubit1, int qubit2, qreal
 }
 
 qreal densmatr_calcPurity(Qureg qureg) {
+    
     return densmatr_calcPurityLocal(qureg);
 }
 
@@ -110,6 +111,7 @@ void densmatr_initPureState(Qureg qureg, Qureg pureState) {
 }
 
 Complex statevec_calcInnerProduct(Qureg bra, Qureg ket) {
+    
     return statevec_calcInnerProductLocal(bra, ket);
 }
 
@@ -160,8 +162,6 @@ qreal statevec_calcTotalProb(Qureg qureg){
         // Don't change the bracketing on the following line
         c = ( t - pTotal ) - y;
         pTotal = t;
-
-
     } 
     return pTotal;
 }
@@ -204,6 +204,16 @@ void reportQuESTEnv(QuESTEnv env){
     printf("Precision: size of qreal is %ld bytes\n", sizeof(qreal));
 }
 
+void getEnvironmentString(QuESTEnv env, char str[200]){
+    int ompStatus=0;
+    int numThreads=1;
+# ifdef _OPENMP
+    ompStatus=1;
+    numThreads=omp_get_max_threads(); 
+# endif
+    sprintf(str, "CUDA=0 OpenMP=%d MPI=0 threads=%d ranks=1", ompStatus, numThreads);
+}
+
 qreal statevec_getRealAmp(Qureg qureg, long long int index){
     return qureg.stateVec.real[index];
 }
@@ -212,79 +222,84 @@ qreal statevec_getImagAmp(Qureg qureg, long long int index){
     return qureg.stateVec.imag[index];
 }
 
-void statevec_compactUnitary(Qureg qureg, const int targetQubit, Complex alpha, Complex beta) 
+void statevec_compactUnitary(Qureg qureg, int targetQubit, Complex alpha, Complex beta) 
 {
     statevec_compactUnitaryLocal(qureg, targetQubit, alpha, beta);
 }
 
-void statevec_unitary(Qureg qureg, const int targetQubit, ComplexMatrix2 u) 
+void statevec_unitary(Qureg qureg, int targetQubit, ComplexMatrix2 u) 
 {
     statevec_unitaryLocal(qureg, targetQubit, u);
 }
 
-void statevec_controlledCompactUnitary(Qureg qureg, const int controlQubit, const int targetQubit, Complex alpha, Complex beta) 
+void statevec_controlledCompactUnitary(Qureg qureg, int controlQubit, int targetQubit, Complex alpha, Complex beta) 
 {
     statevec_controlledCompactUnitaryLocal(qureg, controlQubit, targetQubit, alpha, beta);
 }
 
-void statevec_controlledUnitary(Qureg qureg, const int controlQubit, const int targetQubit, ComplexMatrix2 u) 
+void statevec_controlledUnitary(Qureg qureg, int controlQubit, int targetQubit, ComplexMatrix2 u) 
 {
     statevec_controlledUnitaryLocal(qureg, controlQubit, targetQubit, u);
 }
 
-void statevec_multiControlledUnitary(Qureg qureg, long long int ctrlQubitsMask, long long int ctrlFlipMask, const int targetQubit, ComplexMatrix2 u) 
+void statevec_multiControlledUnitary(Qureg qureg, long long int ctrlQubitsMask, long long int ctrlFlipMask, int targetQubit, ComplexMatrix2 u) 
 {
     statevec_multiControlledUnitaryLocal(qureg, targetQubit, ctrlQubitsMask, ctrlFlipMask, u);
 }
 
-void statevec_pauliX(Qureg qureg, const int targetQubit) 
+void statevec_pauliX(Qureg qureg, int targetQubit) 
 {
     statevec_pauliXLocal(qureg, targetQubit);
 }
 
-void statevec_pauliY(Qureg qureg, const int targetQubit) 
+void statevec_pauliY(Qureg qureg, int targetQubit) 
 {
     int conjFac = 1;
     statevec_pauliYLocal(qureg, targetQubit, conjFac);
 }
 
-void statevec_pauliYConj(Qureg qureg, const int targetQubit) 
+void statevec_pauliYConj(Qureg qureg, int targetQubit) 
 {
     int conjFac = -1;
     statevec_pauliYLocal(qureg, targetQubit, conjFac);
 }
 
-void statevec_controlledPauliY(Qureg qureg, const int controlQubit, const int targetQubit)
+void statevec_controlledPauliY(Qureg qureg, int controlQubit, int targetQubit)
 {
     int conjFac = 1;
     statevec_controlledPauliYLocal(qureg, controlQubit, targetQubit, conjFac);
 }
 
-void statevec_controlledPauliYConj(Qureg qureg, const int controlQubit, const int targetQubit)
+void statevec_controlledPauliYConj(Qureg qureg, int controlQubit, int targetQubit)
 {
     int conjFac = -1;
     statevec_controlledPauliYLocal(qureg, controlQubit, targetQubit, conjFac);
 }
 
-void statevec_hadamard(Qureg qureg, const int targetQubit) 
+void statevec_hadamard(Qureg qureg, int targetQubit) 
 {
     statevec_hadamardLocal(qureg, targetQubit);
 }
 
-void statevec_controlledNot(Qureg qureg, const int controlQubit, const int targetQubit) 
+void statevec_controlledNot(Qureg qureg, int controlQubit, int targetQubit) 
 {
     statevec_controlledNotLocal(qureg, controlQubit, targetQubit);
 }
 
-qreal statevec_calcProbOfOutcome(Qureg qureg, const int measureQubit, int outcome)
-{
-    qreal stateProb=0;
-    stateProb = statevec_findProbabilityOfZeroLocal(qureg, measureQubit);
-    if (outcome==1) stateProb = 1.0 - stateProb;
-    return stateProb;
+void statevec_multiControlledMultiQubitNot(Qureg qureg, int ctrlMask, int targMask) {
+    
+    statevec_multiControlledMultiQubitNotLocal(qureg, ctrlMask, targMask);
 }
 
-qreal densmatr_calcProbOfOutcome(Qureg qureg, const int measureQubit, int outcome) {
+qreal statevec_calcProbOfOutcome(Qureg qureg, int measureQubit, int outcome)
+{
+    qreal outcomeProb = statevec_findProbabilityOfZeroLocal(qureg, measureQubit);
+    if (outcome==1)
+        outcomeProb = 1.0 - outcomeProb;
+    return outcomeProb;
+}
+
+qreal densmatr_calcProbOfOutcome(Qureg qureg, int measureQubit, int outcome) {
     
     qreal outcomeProb = densmatr_findProbabilityOfZeroLocal(qureg, measureQubit);
     if (outcome == 1)
@@ -292,7 +307,17 @@ qreal densmatr_calcProbOfOutcome(Qureg qureg, const int measureQubit, int outcom
     return outcomeProb;
 }
 
-void statevec_collapseToKnownProbOutcome(Qureg qureg, const int measureQubit, int outcome, qreal stateProb)
+void statevec_calcProbOfAllOutcomes(qreal* retProbs, Qureg qureg, int* qubits, int numQubits) {
+    
+    statevec_calcProbOfAllOutcomesLocal(retProbs, qureg, qubits, numQubits);
+}
+
+void densmatr_calcProbOfAllOutcomes(qreal* retProbs, Qureg qureg, int* qubits, int numQubits) {
+    
+    densmatr_calcProbOfAllOutcomesLocal(retProbs, qureg, qubits, numQubits);
+}
+
+void statevec_collapseToKnownProbOutcome(Qureg qureg, int measureQubit, int outcome, qreal stateProb)
 {
     statevec_collapseToKnownProbOutcomeLocal(qureg, measureQubit, outcome, stateProb);
 }
@@ -307,12 +332,12 @@ void seedQuESTDefault(void){
     init_by_array(key, 2);
 }
 
-void statevec_multiControlledTwoQubitUnitary(Qureg qureg, long long int ctrlMask, const int q1, const int q2, ComplexMatrix4 u)
+void statevec_multiControlledTwoQubitUnitary(Qureg qureg, long long int ctrlMask, int q1, int q2, ComplexMatrix4 u)
 {
     statevec_multiControlledTwoQubitUnitaryLocal(qureg, ctrlMask, q1, q2, u);
 }
 
-void statevec_multiControlledMultiQubitUnitary(Qureg qureg, long long int ctrlMask, int* targs, const int numTargs, ComplexMatrixN u)
+void statevec_multiControlledMultiQubitUnitary(Qureg qureg, long long int ctrlMask, int* targs, int numTargs, ComplexMatrixN u)
 {
     statevec_multiControlledMultiQubitUnitaryLocal(qureg, ctrlMask, targs, numTargs, u);
 }
@@ -320,4 +345,29 @@ void statevec_multiControlledMultiQubitUnitary(Qureg qureg, long long int ctrlMa
 void statevec_swapQubitAmps(Qureg qureg, int qb1, int qb2) 
 {
     statevec_swapQubitAmpsLocal(qureg, qb1, qb2);
+}
+
+void densmatr_applyDiagonalOp(Qureg qureg, DiagonalOp op) {
+
+    // we must preload qureg.pairStateVec with the elements of op.
+    // instead of needless cloning, we'll just temporarily swap the pointers
+    qreal* rePtr = qureg.pairStateVec.real;
+    qreal* imPtr = qureg.pairStateVec.imag;
+    qureg.pairStateVec.real = op.real;
+    qureg.pairStateVec.imag = op.imag;
+    
+    densmatr_applyDiagonalOpLocal(qureg, op);
+    
+    qureg.pairStateVec.real = rePtr;
+    qureg.pairStateVec.imag = imPtr;
+}
+
+Complex statevec_calcExpecDiagonalOp(Qureg qureg, DiagonalOp op) {
+
+    return statevec_calcExpecDiagonalOpLocal(qureg, op);
+}
+
+Complex densmatr_calcExpecDiagonalOp(Qureg qureg, DiagonalOp op) {
+    
+    return densmatr_calcExpecDiagonalOpLocal(qureg, op);
 }

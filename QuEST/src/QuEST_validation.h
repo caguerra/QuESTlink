@@ -12,12 +12,19 @@
 # define QUEST_VALIDATION_H
 
 # include "QuEST.h"
+# include <stdio.h>
 
 # ifdef __cplusplus
 extern "C" {
 # endif
 
-void validateCreateNumQubits(int numQubits, const char* caller);
+void validateNumRanks(int numRanks, const char* caller);
+
+void validateNumQubitsInQureg(int numQubits, int numRanks, const char* caller);
+
+void validateNumQubitsInMatrix(int numQubits, const char* caller);
+
+void validateNumQubitsInDiagOp(int numQubits, int numRanks, const char* caller);
 
 void validateAmpIndex(Qureg qureg, long long int ampInd, const char* caller);
 
@@ -29,21 +36,23 @@ void validateControlTarget(Qureg qureg, int controlQubit, int targetQubit, const
 
 void validateUniqueTargets(Qureg qureg, int qubit1, int qubit2, const char* caller);
 
-void validateMultiQubits(Qureg qureg, int* qubits, const int numQubits, const char* caller);
+void validateMultiQubits(Qureg qureg, int* qubits, int numQubits, const char* caller);
 
-void validateMultiTargets(Qureg qurge, int* targetQubits, const int numTargetQubits, const char* caller);
+void validateMultiTargets(Qureg qurge, int* targetQubits, int numTargetQubits, const char* caller);
 
-void validateMultiControls(Qureg qureg, int* controlQubits, const int numControlQubits, const char* caller);
+void validateMultiControls(Qureg qureg, int* controlQubits, int numControlQubits, const char* caller);
 
-void validateMultiControlsTarget(Qureg qureg, int* controlQubits, const int numControlQubits, const int targetQubit, const char* caller);
+void validateMultiControlsTarget(Qureg qureg, int* controlQubits, int numControlQubits, int targetQubit, const char* caller);
 
-void validateMultiControlsMultiTargets(Qureg qureg, int* controlQubits, const int numControlQubits, int* targetQubits, const int numTargetQubits, const char* caller);
+void validateMultiControlsMultiTargets(Qureg qureg, int* controlQubits, int numControlQubits, int* targetQubits, int numTargetQubits, const char* caller);
 
-void validateControlState(int* controlState, const int numControlQubits, const char* caller);
+void validateControlState(int* controlState, int numControlQubits, const char* caller);
 
 void validateOneQubitUnitaryMatrix(ComplexMatrix2 u, const char* caller);
 
 void validateTwoQubitUnitaryMatrix(Qureg qureg, ComplexMatrix4 u, const char* caller);
+
+void validateMultiQubitMatrix(Qureg qureg, ComplexMatrixN u, int numTargs, const char* caller);
 
 void validateMultiQubitUnitaryMatrix(Qureg qureg, ComplexMatrixN u, int numTargs, const char* caller);
 
@@ -69,7 +78,7 @@ void validateSecondQuregStateVec(Qureg qureg2, const char *caller);
 
 void validateNumAmps(Qureg qureg, long long int startInd, long long int numAmps, const char* caller);
 
-void validateFileOpened(int opened, const char* caller);
+void validateFileOpened(int opened, char* fn, const char* caller);
 
 void validateProb(qreal prob, const char* caller);
 
@@ -99,17 +108,43 @@ void validateMultiQubitKrausMap(Qureg qureg, int numTargs, ComplexMatrixN* ops, 
 
 void validateOneQubitDampingProb(qreal prob, const char* caller);
 
+void validateHamilParams(int numQubits, int numTerms, const char* caller);
+
+void validatePauliHamil(PauliHamil hamil, const char* caller);
+
+void validateMatchingQuregPauliHamilDims(Qureg qureg, PauliHamil hamil, const char* caller);
+
+void validateHamilFileParams(int numQubits, int numTerms, FILE* file, char* fn, const char* caller);
+
+void validateHamilFileCoeffParsed(int parsed, PauliHamil h, FILE* file, char* fn, const char* caller);
+
+void validateHamilFilePauliParsed(int parsed, PauliHamil h, FILE* file, char* fn, const char* caller);
+
+void validateHamilFilePauliCode(enum pauliOpType code, PauliHamil h, FILE* file, char* fn, const char* caller);
+
+void validateTrotterParams(int order, int reps, const char* caller);
+
+void validateDiagOpInit(DiagonalOp, const char* caller);
+
+void validateDiagonalOp(Qureg qureg, DiagonalOp op, const char* caller);
+
+void validateDiagPauliHamil(DiagonalOp op, PauliHamil hamil, const char *caller);
+
+void validateDiagPauliHamilFromFile(PauliHamil h, int numRanks, const char* caller);
+
+void validateNumElems(DiagonalOp op, long long int startInd, long long int numElems, const char* caller);
+
 void validateQubitSubregs(Qureg qureg, int* qubits, int* numQubitsPerReg, const int numReg, const char* caller);
 
 void validatePhaseFuncOverrides(const int numQubits, enum bitEncoding encoding, long long int* overrideInds, int numOverrides, const char* caller);
 
 void validateMultiVarPhaseFuncOverrides(int* numQubitsPerReg, const int numRegs, enum bitEncoding encoding, long long int* overrideInds, int numOverrides, const char* caller);
 
-void validateNumPhaseFuncTerms(const int numTerms, const char* caller);
+void validatePhaseFuncTerms(int numQubits, enum bitEncoding encoding, qreal* coeffs, qreal* exponents, int numTerms, long long int* overrideInds, int numOverrides, const char* caller);
 
-void validateNumMultiVarPhaseFuncTerms(int* numTermsPerReg, const int numRegs, const char* caller);
+void validateMultiVarPhaseFuncTerms(int* numQubitsPerReg, int numRegs, enum bitEncoding encoding, qreal* exponents, int* numTermsPerReg, const char* caller);
 
-void validatePhaseFuncName(enum phaseFunc funcCode, int numParams, const char* caller);
+void validatePhaseFuncName(enum phaseFunc funcCode, int numRegs, int numParams, const char* caller);
 
 void validateBitEncoding(int numQubits, enum bitEncoding encoding, const char* caller);
 
